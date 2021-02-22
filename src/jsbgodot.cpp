@@ -22,10 +22,10 @@ void JSBGodot::_register_methods() {
     register_method("_process", &JSBGodot::_process);
     register_method("_physics_process", &JSBGodot::_physics_process);
     register_method("_input", &JSBGodot::_input);
-    register_property<JSBGodot, float>("input_pitch", &JSBGodot::input_pitch, 0.0);
-    register_property<JSBGodot, float>("input_roll", &JSBGodot::input_roll, 0.0);
-    register_property<JSBGodot, float>("input_rudder", &JSBGodot::input_rudder, 0.0);
-    register_property<JSBGodot, float>("input_throttle", &JSBGodot::input_throttle, 1.0);
+    register_property<JSBGodot, double>("input_pitch", &JSBGodot::input_pitch, 0.0);
+    register_property<JSBGodot, double>("input_roll", &JSBGodot::input_roll, 0.0);
+    register_property<JSBGodot, double>("input_rudder", &JSBGodot::input_rudder, 0.0);
+    register_property<JSBGodot, double>("input_throttle", &JSBGodot::input_throttle, 1.0);
 }
 
 JSBGodot::JSBGodot() {
@@ -41,7 +41,7 @@ void JSBGodot::_init() {
     char cwd[1024];
     char *thing = getcwd(cwd, 1024);
     printf("cwd: %s\n", thing);
-    FDMExec->SetRootDir(SGPath("../jsbsim"));
+    FDMExec->SetRootDir(SGPath("./submodules/jsbgodot/jsbsim"));
     FDMExec->SetAircraftPath(SGPath("aircraft"));
     FDMExec->SetEnginePath(SGPath("engine"));
     FDMExec->SetSystemsPath(SGPath("systems"));
@@ -53,9 +53,15 @@ void JSBGodot::_init() {
         FDMExec->LoadModel(SGPath("aircraft"),
                            SGPath("engine"),
                            SGPath("systems"),
-                           "x24b");
+                           "f16");
 //        initialise();
         FDMExec->GetIC()->Load(SGPath("reset00.xml"));
+
+        std::shared_ptr<JSBSim::FGInitialCondition> ic = FDMExec->GetIC();
+        ic->SetLatitudeDegIC(0.0);
+        ic->SetLongitudeDegIC(0.0);
+        ic->SetAltitudeASLFtIC(100 * 3.28084);
+        ic->SetMachIC(0.3);
         copy_inputs_to_JSBSim();
 
         FDMExec->RunIC();
@@ -68,10 +74,15 @@ void JSBGodot::_init() {
 
 void JSBGodot::initialise() {
     std::shared_ptr<JSBSim::FGInitialCondition> ic = FDMExec->GetIC();
-    ic->SetLatitudeDegIC(0.0);
-    ic->SetLongitudeDegIC(0.0);
-    ic->SetAltitudeASLFtIC(10000);
+
+    start_pos = JSBGodot::_convert_location_from_godot(get_translation());
+    start_rot = get_rotation();
+
+    ic->SetLatitudeDegIC(start_pos.x);
+    ic->SetLongitudeDegIC(start_pos.z);
+    ic->SetAltitudeASLFtIC(start_pos.y * 3.28084);
     ic->SetMachIC(0.3);
+
 }
 
 void JSBGodot::copy_inputs_to_JSBSim() {
@@ -94,23 +105,21 @@ void JSBGodot::copy_outputs_from_JSBSim() {
 //    std::shared_ptr<JSBSim::FGAtmosphere> Atmosphere = FDMExec->GetAtmosphere();
 //    std::shared_ptr<JSBSim::FGAccelerations> Accelerations = FDMExec->GetAccelerations();
 
-    float altitude = Propagate->GetAltitudeASL();
-    float latitude = Propagate->GetLocation().GetLatitudeDeg();
-    float longitude = Propagate->GetLocation().GetLongitudeDeg();
+    double altitude = Propagate->GetAltitudeASLmeters();
+    double latitude = Propagate->GetLocation().GetLatitudeDeg();
+    double longitude = Propagate->GetLocation().GetLongitudeDeg();
 
-    float bank = Propagate->GetEuler(JSBSim::FGForce::ePhi);
-    float pitch = Propagate->GetEuler(JSBSim::FGForce::eTht);
-    float heading = Propagate->GetEuler(JSBSim::FGForce::ePsi);
+    double bank = Propagate->GetEuler(JSBSim::FGForce::ePhi);
+    double pitch = Propagate->GetEuler(JSBSim::FGForce::eTht);
+    double heading = Propagate->GetEuler(JSBSim::FGForce::ePsi);
 
-    Vector3 newRot = Vector3(pitch, heading, bank);
+    Vector3 newRot = Vector3(pitch, JSBGodot::_scale_degrees(heading), bank);
     set_rotation(newRot);
 
-    float x = longitude;
-    float y = altitude;
-    float z = latitude;
-    Vector3 newPos = Vector3(x, y, z);
+    Vector3 newPos = JSBGodot::_convert_location_to_godot(latitude, longitude, altitude);
     set_translation(newPos);
-    printf("LLA: %f,%f,%f\n", latitude, longitude, altitude);
+    //printf("OLD: %f,%f,%f\n", newPos.x, newPos.y, newPos.z);
+    //printf("LLA: %f,%f,%f\n", latitude, longitude, altitude);
 }
 
 void JSBGodot::_input(const Ref<InputEvent> event) {
@@ -122,6 +131,44 @@ void JSBGodot::_physics_process(const real_t delta) {
     copy_outputs_from_JSBSim();
 }
 
-void JSBGodot::_process(float delta) {
+void JSBGodot::_process(double delta) {
 }
 
+Vector3 JSBGodot::_convert_location_to_godot(double latitude, double longitude, double altitude_meters) {
+    //Length in meters of 1° of latitude = multiply by 111.32 km
+    //Length in meters of 1° of longitude = multiply by 40075 km * cos( latitude ) / 360
+    return(Vector3(longitude * 40075000 * (cos(latitude) / 360), altitude_meters, latitude * 111139));
+}
+
+Vector3 JSBGodot::_convert_location_from_godot(Vector3 translation) {
+    double latitude = translation.z / 111139;
+    double longitude = translation.x / (40075000 * (cos(latitude) / 360));
+    return(Vector3(longitude, translation.y, latitude));
+}
+
+double JSBGodot::_scale_degrees(double degrees) {
+	double scaled_degrees;
+
+	if(degrees < 0.0f)
+	{
+		scaled_degrees = std::fmod(degrees, -360.0f);
+	}
+	else
+	{
+		scaled_degrees = std::fmod(degrees, 360.0f);
+	}
+
+    if((scaled_degrees < -180.0f) || (scaled_degrees > 180.0f))
+    {
+        if(scaled_degrees > 180.0f)
+        {
+            scaled_degrees -= 360.0f;
+        }
+        else if(scaled_degrees < -180.0f)
+        {
+            scaled_degrees += 360.0f;
+        }
+    }
+
+	return (scaled_degrees);
+}
