@@ -1,0 +1,10 @@
+-I/usr/include/x86_64-linux-gnu
+-O3
+-g0
+
+-Igodot-cpp/godot_headers
+-Ijsbsim/src
+-Igodot-cpp/include
+-Igodot-cpp/include/core
+-Igodot-cpp/include/gen
+-Isrc

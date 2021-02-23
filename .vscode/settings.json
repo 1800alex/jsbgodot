@@ -1,0 +1,26 @@
+{
+	"editor.tabSize": 4,
+	"files.associations": {
+		"*.c": "c",
+		"*.h": "c",
+		"*.cc": "cpp",
+		"*.cpp": "cpp",
+		"*.hpp": "cpp"
+	},
+	"editor.formatOnSave": false,
+	"[c]": {
+		"editor.formatOnType": true,
+		"editor.formatOnSave": true
+	},
+	"[cpp]": {
+		"editor.formatOnType": true,
+		"editor.formatOnSave": true
+	},
+	"C_Cpp.autocomplete": "Disabled",
+	"C_Cpp.errorSquiggles": "Disabled",
+	"C_Cpp.formatting": "Disabled",
+	"C_Cpp.intelliSenseEngine": "Disabled",
+	"clangd.arguments": [
+		"--background-index"
+	]
+}

@@ -1,5 +1,9 @@
-#ifndef JSBGODOT_H
-#define JSBGODOT_H
+/*****************************************************************************
+*   File name: jsbgodot.hpp
+*   File description: 
+*****************************************************************************/
+#ifndef JSBGODOT_HPP
+#define JSBGODOT_HPP
 
 #include <Godot.hpp>
 #include <Sprite.hpp>
@@ -53,4 +57,4 @@ public:
 
 } // namespace godot
 
-#endif
+#endif /* JSBGODOT_HPP */
